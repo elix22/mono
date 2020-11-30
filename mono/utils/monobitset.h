@@ -1,26 +1,12 @@
+/**
+ * \file
+ */
+
 #ifndef __MONO_BITSET_H__
 #define __MONO_BITSET_H__
 
 #include <glib.h>
-#ifdef SGEN_WITHOUT_MONO
-#include "mono/utils/mono-compiler.h"
-#define MONO_API
-#else
 #include <mono/utils/mono-publib.h>
-#endif
-
-/*
- * When embedding, you have to define MONO_ZERO_LEN_ARRAY before including any
- * other Mono header file if you use a different compiler from the one used to
- * build Mono.
- */
-#ifndef MONO_ZERO_LEN_ARRAY
-#ifdef __GNUC__
-#define MONO_ZERO_LEN_ARRAY 0
-#else
-#define MONO_ZERO_LEN_ARRAY 1
-#endif
-#endif
 
 #define MONO_BITSET_BITS_PER_CHUNK (8 * sizeof (gsize))
 
@@ -134,5 +120,8 @@ MONO_API gboolean    mono_bitset_equal        (const MonoBitSet *src, const Mono
 MONO_API void        mono_bitset_foreach      (MonoBitSet *set, MonoBitSetFunc func, gpointer data);
 
 MONO_API void        mono_bitset_intersection_2 (MonoBitSet *dest, const MonoBitSet *src1, const MonoBitSet *src2);
+
+gboolean
+mono_bitset_test_safe (const MonoBitSet *set, guint32 pos);
 
 #endif /* __MONO_BITSET_H__ */

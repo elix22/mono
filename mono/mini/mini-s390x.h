@@ -1,3 +1,7 @@
+/**
+ * \file
+ */
+
 #ifndef __MONO_MINI_S390X_H__
 #define __MONO_MINI_S390X_H__
 
@@ -25,10 +29,15 @@ struct MonoLMF {
 	gdouble     fregs[16];
 };
 
+/**
+ * Platform-specific compile control information
+ */
 typedef struct MonoCompileArch {
-	gpointer    litpool;
-	glong	    litsize;
-	int         bkchain_reg;
+	int         bkchain_reg;	/** Register being used as stack backchain */
+	uint32_t    used_fp_regs;	/** Floating point register use mask */
+	int	    fpSize;		/** Size of floating point save area */
+	MonoInst    *ss_tramp_var;	/** Single-step variable */
+	MonoInst    *bp_tramp_var;	/** Breakpoint variable */
 } MonoCompileArch;
 
 typedef struct
@@ -39,7 +48,13 @@ typedef struct
 	void *return_address;
 } MonoS390StackFrame;
 
-// #define MONO_ARCH_SIGSEGV_ON_ALTSTACK		1
+/* Structure used by the sequence points */
+struct SeqPointInfo {
+	gpointer ss_tramp_addr;
+	gpointer bp_addrs [MONO_ZERO_LEN_ARRAY];
+};
+
+#define MONO_ARCH_SIGSEGV_ON_ALTSTACK			1
 #define MONO_ARCH_EMULATE_LCONV_TO_R8_UN 		1
 #define MONO_ARCH_NO_EMULATE_LONG_MUL_OPTS		1
 #define MONO_ARCH_NO_EMULATE_LONG_SHIFT_OPS		1
@@ -47,28 +62,33 @@ typedef struct
 #define MONO_ARCH_NEED_DIV_CHECK			1
 #define MONO_ARCH_SIGNAL_STACK_SIZE 			256*1024
 #define MONO_ARCH_HAVE_DECOMPOSE_OPTS 			1
-#define MONO_ARCH_HAVE_TLS_GET				1
-#define MONO_ARCH_ENABLE_MONO_LMF_VAR			1
 #define MONO_ARCH_IMT_REG				s390_r9
 #define MONO_ARCH_VTABLE_REG				S390_FIRST_ARG_REG
 #define MONO_ARCH_RGCTX_REG				MONO_ARCH_IMT_REG
-#define MONO_ARCH_HAVE_SIGCTX_TO_MONOCTX		1
 #define MONO_ARCH_SOFT_DEBUG_SUPPORTED			1
 #define MONO_ARCH_HAVE_CONTEXT_SET_INT_REG		1
 #define MONO_ARCH_USE_SIGACTION 			1
 #define MONO_ARCH_GC_MAPS_SUPPORTED			1
 #define MONO_ARCH_GSHARED_SUPPORTED			1
 #define MONO_ARCH_MONITOR_ENTER_ADJUSTMENT		1
-#define MONO_ARCH_HAVE_HANDLER_BLOCK_GUARD		1
 #define MONO_ARCH_HAVE_INVALIDATE_METHOD		1
 #define MONO_ARCH_HAVE_OP_GENERIC_CLASS_INIT		1
 #define MONO_ARCH_HAVE_SETUP_ASYNC_CALLBACK		1
+#define MONO_ARCH_HAVE_TRACK_FPREGS			1
+#define MONO_ARCH_HAVE_OPTIMIZED_DIV			1
+#define MONO_ARCH_HAVE_OP_TAILCALL_MEMBASE		1
+#define MONO_ARCH_HAVE_OP_TAILCALL_REG			1
+#define MONO_ARCH_HAVE_SDB_TRAMPOLINES			1
+#define MONO_ARCH_HAVE_SETUP_RESUME_FROM_SIGNAL_HANDLER_CTX	1
+#define MONO_ARCH_HAVE_UNWIND_BACKTRACE 		1
 
 #define S390_STACK_ALIGNMENT		 8
 #define S390_FIRST_ARG_REG 		s390_r2
 #define S390_LAST_ARG_REG 		s390_r6
 #define S390_FIRST_FPARG_REG 		s390_f0
 #define S390_LAST_FPARG_REG 		s390_f6
+
+#define S390_FP_SAVE_MASK		0xf0
 
 /*===============================================*/
 /* Definitions used by mini-codegen.c            */
@@ -77,13 +97,15 @@ typedef struct
 /*------------------------------------------------------*/
 /* use s390_r2-s390_r6 as parm registers                */
 /* s390_r0, s390_r1, s390_r12, s390_r13 used internally */
-/* s390_r8..s390_r11 are used for global regalloc       */
+/* s390_r8..s390_r10 are used for global regalloc       */
+/* -- except for s390_r9 which is used as IMT pointer   */
+/* s390_r11 is sometimes used as the frame pointer      */
 /* s390_r15 is the stack pointer                        */
 /*------------------------------------------------------*/
 
-#define MONO_ARCH_CALLEE_REGS (0xfc)
+#define MONO_ARCH_CALLEE_REGS (0x00fc)
 
-#define MONO_ARCH_CALLEE_SAVED_REGS 0xff80
+#define MONO_ARCH_CALLEE_SAVED_REGS 0xfd00
 
 /*----------------------------------------*/
 /* use s390_f1/s390_f3-s390_f15 as temps  */
@@ -94,7 +116,6 @@ typedef struct
 #define MONO_ARCH_CALLEE_SAVED_FREGS 0
 
 #define MONO_ARCH_USE_FPSTACK FALSE
-#define MONO_ARCH_FPSTACK_SIZE 0
 
 #define MONO_ARCH_INST_FIXED_REG(desc) ((desc == 'o') ? s390_r2 : 		\
 					((desc == 'g') ? s390_f0 : 		\
@@ -120,6 +141,10 @@ typedef struct
 #define MONO_ARCH_CALLEE_XREGS		0x0
 #define MONO_ARCH_CALLEE_SAVED_XREGS	0x0
 
+// Does the ABI have a volatile non-parameter register, so tailcall
+// can pass context to generics or interfaces?
+#define MONO_ARCH_HAVE_VOLATILE_NON_PARAM_REGISTER 1 // FIXME?
+
 /*-----------------------------------------------*/
 /* Macros used to generate instructions          */
 /*-----------------------------------------------*/
@@ -133,10 +158,9 @@ typedef struct
 #define S390_ALIGN(v, a)	(((a) > 0 ? (((v) + ((a) - 1)) & ~((a) - 1)) : (v)))
 
 #define MONO_INIT_CONTEXT_FROM_FUNC(ctx,func) do {			\
-		MonoS390StackFrame *sframe;				\
-		__asm__ volatile("lgr   %0,15" : "=r" (sframe));	\
-		MONO_CONTEXT_SET_BP ((ctx), sframe->prev);		\
-		MONO_CONTEXT_SET_SP ((ctx), sframe->prev);		\
+		void *sp = __builtin_frame_address (0);			\
+		MONO_CONTEXT_SET_BP ((ctx), sp);			\
+		MONO_CONTEXT_SET_SP ((ctx), sp);			\
 		MONO_CONTEXT_SET_IP ((ctx), func);			\
 	} while (0)
 

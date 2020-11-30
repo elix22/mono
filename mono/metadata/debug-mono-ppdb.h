@@ -1,6 +1,6 @@
-/*
- * debug-mono-ppdb.c: Support for the portable PDB symbol
- * file format
+/**
+ * \file
+ * Support for the portable PDB symbol file format
  *
  *
  * Author:
@@ -34,5 +34,17 @@ mono_ppdb_get_seq_points (MonoDebugMethodInfo *minfo, char **source_file, GPtrAr
 
 MonoDebugLocalsInfo*
 mono_ppdb_lookup_locals (MonoDebugMethodInfo *minfo);
+
+MonoDebugMethodAsyncInfo*
+mono_ppdb_lookup_method_async_debug_info (MonoDebugMethodInfo *minfo);
+
+MonoImage *
+mono_ppdb_get_image (MonoPPDBFile *ppdb);
+
+char *
+mono_ppdb_get_sourcelink (MonoDebugHandle *handle);
+
+gboolean 
+mono_ppdb_is_embedded (MonoPPDBFile *ppdb);
 
 #endif

@@ -25,29 +25,44 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
-#if SECURITY_DEP
+
+#if MONO_SECURITY_ALIAS
+extern alias MonoSecurity;
+#endif
+
+#if MONO_SECURITY_ALIAS
+using MX = MonoSecurity::Mono.Security.X509;
+#else
+using MX = Mono.Security.X509;
+#endif
+
+#if MONO_FEATURE_BTLS
+using Mono.Btls;
+#endif
+
+using System.IO;
+using System.Text;
+using Mono;
+
 namespace System.Security.Cryptography.X509Certificates
 {
 	internal static class X509Helper2
 	{
-		internal static void ThrowIfContextInvalid (X509CertificateImpl impl)
+		/*
+		 * This is used by X509ChainImplMono
+		 * 
+		 * Some of the missing APIs such as X509v3 extensions can be added to the native
+		 * BTLS implementation.
+		 * 
+		 * We should also consider replacing X509ChainImplMono with a new X509ChainImplBtls
+		 * at some point.
+		 */
+		[MonoTODO ("Investigate replacement; see comments in source.")]
+		internal static MX.X509Certificate GetMonoCertificate (X509Certificate2 certificate)
 		{
-			X509Helper.ThrowIfContextInvalid (impl);
-		}
-
-		internal static X509Certificate2Impl Import (byte[] rawData, string password, X509KeyStorageFlags keyStorageFlags)
-		{
-			var impl = new X509Certificate2ImplMono ();
-			impl.Import (rawData, password, keyStorageFlags);
-			return impl;
-		}
-
-		internal static X509Certificate2Impl Import (X509Certificate cert)
-		{
-			var impl2 = cert.Impl as X509Certificate2Impl;
-			if (impl2 != null)
-				return (X509Certificate2Impl)impl2.Clone ();
-			return Import (cert.GetRawCertData (), null, X509KeyStorageFlags.DefaultKeySet);
+			if (certificate.Impl is X509Certificate2ImplMono monoImpl)
+				return monoImpl.MonoCertificate;
+			return new MX.X509Certificate (certificate.RawData);
 		}
 
 		internal static X509ChainImpl CreateChainImpl (bool useMachineContext)
@@ -70,6 +85,43 @@ namespace System.Security.Cryptography.X509Certificates
 		{
 			return new CryptographicException (Locale.GetText ("Chain instance is empty."));
 		}
+
+		[Obsolete ("This is only used by Mono.Security's X509Store and will be replaced shortly.")]
+		internal static long GetSubjectNameHash (X509Certificate certificate)
+		{
+#if MONO_FEATURE_BTLS
+			X509Helper.ThrowIfContextInvalid (certificate.Impl);
+			using (var x509 = GetNativeInstance (certificate.Impl))
+			using (var subject = x509.GetSubjectName ())
+				return subject.GetHash ();
+#else
+			throw new PlatformNotSupportedException ();
+#endif
+		}
+
+		[Obsolete ("This is only used by Mono.Security's X509Store and will be replaced shortly.")]
+		internal static void ExportAsPEM (X509Certificate certificate, Stream stream, bool includeHumanReadableForm)
+		{
+#if MONO_FEATURE_BTLS
+			X509Helper.ThrowIfContextInvalid (certificate.Impl);
+			using (var x509 = GetNativeInstance (certificate.Impl))
+			using (var bio = MonoBtlsBio.CreateMonoStream (stream))
+				x509.ExportAsPEM (bio, includeHumanReadableForm);
+#else
+			throw new PlatformNotSupportedException ();
+#endif
+		}
+
+#if MONO_FEATURE_BTLS
+		static MonoBtlsX509 GetNativeInstance (X509CertificateImpl impl)
+		{
+			X509Helper.ThrowIfContextInvalid (impl);
+			var btlsImpl = impl as X509CertificateImplBtls;
+			if (btlsImpl != null)
+				return btlsImpl.X509.Copy ();
+			else
+				return MonoBtlsX509.LoadFromData (impl.RawData, MonoBtlsX509Format.DER);
+		}
+#endif
 	}
 }
-#endif

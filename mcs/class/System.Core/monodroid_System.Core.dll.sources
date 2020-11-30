@@ -1,7 +1,8 @@
 #include common_System.Core.dll.sources
 #include dynamic_System.Core.dll.sources
+#include unix_net_4_x_System.Core.dll.sources
 
 System.Security.Cryptography/AesCryptoServiceProvider.cs
 System.Security.Cryptography/AesTransform.cs
 
-../../../external/referencesource/System.Core/System/Security/Cryptography/AesManaged.cs
+../referencesource/System.Core/System/Security/Cryptography/AesManaged.cs

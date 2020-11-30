@@ -30,6 +30,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Threading;
 
 namespace System {
 	internal interface ModifierSpec {
@@ -69,6 +70,18 @@ namespace System {
 		public override string ToString ()
 		{
 			return Append (new Text.StringBuilder ()).ToString ();
+		}
+
+		public int Rank {
+			get {
+				return dimensions;
+			}
+		}
+
+		public bool IsBound {
+			get {
+				return bound;
+			}
 		}
 	}
 
@@ -129,7 +142,7 @@ namespace System {
 				if (nested != null)
 					return nested;
 				else
-					return EmptyArray<TypeName>.Value;
+					return Array.Empty<TypeName> ();
 			}
 		}
 
@@ -138,7 +151,7 @@ namespace System {
 				if (modifier_spec != null)
 					return modifier_spec;
 				else
-					return EmptyArray<ModifierSpec>.Value;
+					return Array.Empty<ModifierSpec> ();
 			}
 		}
 
@@ -218,7 +231,7 @@ namespace System {
 			if (typeName == null)
 				throw new ArgumentNullException ("typeName");
 
-			TypeSpec res = Parse (typeName, ref pos, false, false);
+			TypeSpec res = Parse (typeName, ref pos, false, true);
 			if (pos < typeName.Length)
 				throw new ArgumentException ("Count not parse the whole type name", "typeName");
 			return res;
@@ -283,11 +296,11 @@ namespace System {
 			return false;
 		}
 
-		internal Type Resolve (Func<AssemblyName,Assembly> assemblyResolver, Func<Assembly,string,bool,Type> typeResolver, bool throwOnError, bool ignoreCase)
+		internal Type Resolve (Func<AssemblyName,Assembly> assemblyResolver, Func<Assembly,string,bool,Type> typeResolver, bool throwOnError, bool ignoreCase, ref StackCrawlMark stackMark)
 		{
 			Assembly asm = null;
 			if (assemblyResolver == null && typeResolver == null)
-				return Type.GetType (name.DisplayName, throwOnError, ignoreCase);
+				return RuntimeType.GetType (DisplayFullName, throwOnError, ignoreCase, false, ref stackMark);
 
 			if (assembly_name != null) {
 				if (assemblyResolver != null)
@@ -328,7 +341,7 @@ namespace System {
 			if (generic_params != null) {
 				Type[] args = new Type [generic_params.Count];
 				for (int i = 0; i < args.Length; ++i) {
-					var tmp = generic_params [i].Resolve (assemblyResolver, typeResolver, throwOnError, ignoreCase);
+					var tmp = generic_params [i].Resolve (assemblyResolver, typeResolver, throwOnError, ignoreCase, ref stackMark);
 					if (tmp == null) {
 						if (throwOnError)
 							throw new TypeLoadException ("Could not resolve type '" + generic_params [i].name + "'");
@@ -376,6 +389,12 @@ namespace System {
 			pos = p;
 		}
 
+		static void BoundCheck (int idx, string s)
+		{
+			if (idx >= s.Length)
+				throw new ArgumentException ("Invalid generic arguments spec", "typeName");
+		}
+
 		static TypeIdentifier ParsedTypeIdentifier (string displayName)
 		{
 			return TypeIdentifiers.FromDisplay(displayName);
@@ -383,6 +402,17 @@ namespace System {
 
 		static TypeSpec Parse (string name, ref int p, bool is_recurse, bool allow_aqn)
 		{
+			// Invariants:
+			//  - On exit p, is updated to pos the current unconsumed character.
+			//
+			//  - The callee peeks at but does not consume delimiters following
+			//    recurisve parse (so for a recursive call like the args of "Foo[P,Q]"
+			//    we'll return with p either on ',' or on ']'.  If the name was aqn'd
+			//    "Foo[[P,assmblystuff],Q]" on return p with be on the ']' just
+			//    after the "assmblystuff")
+			//
+			//  - If allow_aqn is True, assembly qualification is optional.
+			//    If allow_aqn is False, assembly qualification is prohibited.
 			int pos = p;
 			int name_start;
 			bool in_modifiers = false;
@@ -426,7 +456,9 @@ namespace System {
 			}
 
 			if (name_start < pos)
-				data.AddName (name.Substring (name_start, pos - name_start));		
+				data.AddName (name.Substring (name_start, pos - name_start));
+			else if (name_start == pos)
+				data.AddName (String.Empty);
 
 			if (in_modifiers) {
 				for (; pos < name.Length; ++pos) {
@@ -450,18 +482,24 @@ namespace System {
 						data.AddModifier (new PointerSpec(pointer_level));
 						break;
 					case ',':
-						if (is_recurse) {
+						if (is_recurse && allow_aqn) {
 							int end = pos;
 							while (end < name.Length && name [end] != ']')
 								++end;
 							if (end >= name.Length)
 								throw new ArgumentException ("Unmatched ']' while parsing generic argument assembly name");
 							data.assembly_name = name.Substring (pos + 1, end - pos - 1).Trim ();
-							p = end + 1;
+							p = end;
 							return data;						
 						}
-						data.assembly_name = name.Substring (pos + 1).Trim ();
-						pos = name.Length;
+						if (is_recurse) {
+							p = pos;
+							return data;
+						}
+						if (allow_aqn) {
+							data.assembly_name = name.Substring (pos + 1).Trim ();
+							pos = name.Length;
+						}
 						break;
 					case '[':
 						if (data.is_byref)
@@ -482,11 +520,17 @@ namespace System {
 								if (aqn)
 									++pos; //skip '[' to the start of the type
 								args.Add (Parse (name, ref pos, true, aqn));
-								if (pos >= name.Length)
-									throw new ArgumentException ("Invalid generic arguments spec", "typeName");
+								BoundCheck (pos, name);
+								if (aqn) {
+									if (name [pos] == ']')
+										++pos;
+									else
+										throw new ArgumentException ("Unclosed assembly-qualified type name at " + name[pos], "typeName");
+									BoundCheck (pos, name);
+}
 
 								if (name [pos] == ']')
-										break;
+									break;
 								if (name [pos] == ',')
 									++pos; // skip ',' to the start of the next arg
 								else
@@ -523,7 +567,7 @@ namespace System {
 						break;
 					case ']':
 						if (is_recurse) {
-							p = pos + 1;
+							p = pos;
 							return data;
 						}
 						throw new ArgumentException ("Unmatched ']'", "typeName");

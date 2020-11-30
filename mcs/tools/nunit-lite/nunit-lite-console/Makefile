@@ -3,7 +3,11 @@ SUBDIRS =
 include ../../../build/rules.make
 
 PROGRAM = nunit-lite-console.exe
-LOCAL_MCS_FLAGS = /r:nunitlite.dll 
+LIB_REFS = nunitlite
+LOCAL_MCS_FLAGS =
+
+NO_INSTALL = yes
 
 include ../../../build/executable.make
 
+.NOTPARALLEL:

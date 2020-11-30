@@ -1,5 +1,6 @@
-/*
- * hazard-pointer.h: Hazard pointer related code.
+/**
+ * \file
+ * Hazard pointer related code.
  *
  * (C) Copyright 2011 Novell, Inc
  * Licensed under the MIT license. See LICENSE file in the project root for full license information.
@@ -10,6 +11,7 @@
 #include <glib.h>
 #include <mono/utils/mono-compiler.h>
 #include <mono/utils/mono-membar.h>
+#include <mono/utils/mono-publib.h>
 
 #define HAZARD_POINTER_COUNT 3
 
@@ -19,23 +21,13 @@ typedef struct {
 
 typedef void (*MonoHazardousFreeFunc) (gpointer p);
 
-typedef enum {
-	HAZARD_FREE_MAY_LOCK,
-	HAZARD_FREE_NO_LOCK,
-} HazardFreeLocking;
+MONO_API gboolean mono_thread_hazardous_try_free (gpointer p, MonoHazardousFreeFunc free_func);
+MONO_API void mono_thread_hazardous_queue_free (gpointer p, MonoHazardousFreeFunc free_func);
 
-typedef enum {
-	HAZARD_FREE_SAFE_CTX,
-	HAZARD_FREE_ASYNC_CTX,
-} HazardFreeContext;
-
-gboolean mono_thread_hazardous_try_free (gpointer p, MonoHazardousFreeFunc free_func);
-void mono_thread_hazardous_queue_free (gpointer p, MonoHazardousFreeFunc free_func);
-
-void mono_thread_hazardous_try_free_all (void);
+MONO_API void mono_thread_hazardous_try_free_all (void);
 void mono_thread_hazardous_try_free_some (void);
-MonoThreadHazardPointers* mono_hazard_pointer_get (void);
-gpointer get_hazardous_pointer (gpointer volatile *pp, MonoThreadHazardPointers *hp, int hazard_index);
+MONO_API MonoThreadHazardPointers* mono_hazard_pointer_get (void);
+gpointer mono_get_hazardous_pointer (gpointer volatile *pp, MonoThreadHazardPointers *hp, int hazard_index);
 
 #define mono_hazard_pointer_set(hp,i,v)	\
 	do { g_assert ((i) >= 0 && (i) < HAZARD_POINTER_COUNT); \

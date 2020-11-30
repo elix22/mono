@@ -1,3 +1,4 @@
+../../test-helpers/TestResourceHelper.cs
 System.Runtime.Serialization.Json/DataContractJsonSerializerTest.cs
 System.Runtime.Serialization.Json/JsonReaderTest.cs
 System.Runtime.Serialization.Json/JsonWriterTest.cs
@@ -15,6 +16,7 @@ System.Runtime.Serialization/DataContractSerializerTest_NullableWithDictionary.c
 System.Runtime.Serialization/DataContractSerializerTest_InvalidCharacters.cs
 System.Runtime.Serialization/DataContractSerializerTest_ISerializable.cs
 System.Runtime.Serialization/DataContractSerializerTest.cs
+System.Runtime.Serialization/Exceptions.cs
 System.Runtime.Serialization/KnownTypeAttributeTest.cs
 System.Runtime.Serialization/XmlObjectSerializerTest.cs
 System.Runtime.Serialization/XsdDataContractExporterTest.cs

@@ -7,30 +7,29 @@ include $(XBUILD_DIR)/xbuild.make
 
 LIBRARY = Microsoft.Build.dll
 
-LIB_REFS = System System.Core System.Xml Microsoft.Build.Engine Microsoft.Build.Framework
+LIB_REFS = $(PARENT_PROFILE)System $(PARENT_PROFILE)System.Core $(PARENT_PROFILE)System.Xml Microsoft.Build.Engine Microsoft.Build.Framework
+KEYFILE = ../msfinal.pub
 LIB_MCS_FLAGS = \
-	/r:$(corlib)				\
-	/r:System.dll				\
-	/r:System.Core.dll			\
-	/r:System.Xml.dll			\
-	/r:Microsoft.Build.Engine.dll		\
-	/r:Microsoft.Build.Framework.dll	\
 	/d:MICROSOFT_BUILD_DLL
-	
-TEST_MCS_FLAGS = $(LIB_MCS_FLAGS) \
-	/r:Microsoft.Build.Utilities.v4.0.dll
+
+TEST_RESOURCE_FILES = \
+	Test/resources/FunctionalTestReferenceProject.csproj	\
+	Test/resources/FunctionalTestReferenceProject3.csproj	\
+	Test/resources/Microsoft.Build.Test.csproj	\
+	Test/resources/Microsoft.Build.csproj
+
+TEST_MCS_FLAGS = $(LIB_MCS_FLAGS) $(foreach r, $(TEST_RESOURCE_FILES), -resource:$(r),$(r))
+TEST_LIB_REFS = $(XBUILD_UTILITIES)
+TEST_NUNITLITE_APP_CONFIG_RUNTIME=Test/test-config-file-$(PROFILE)
 
 EXTRA_DISTFILES = \
 	Microsoft.Build.Internal/ExpressionParser.jay	\
-	Test/FunctionalTestReferenceProject.csproj	\
-	Test/FunctionalTestReferenceProject3.csproj	\
-	Test/Microsoft.Build.Test.csproj	\
-	Test/Microsoft.Build.csproj
+	$(TEST_RESOURCE_FILES)
 
 EXPR_PARSER = Microsoft.Build.Internal/ExpressionParser
 
 $(EXPR_PARSER).cs: $(EXPR_PARSER).jay $(topdir)/jay/skeleton.cs
-	(cd Microsoft.Build.Internal; $(topdir)/../jay/jay -ctv < $(topdir)/../jay/skeleton.cs ExpressionParser.jay > ExpressionParser.cs)
+	(cd Microsoft.Build.Internal; $(topdir)/../jay/jay -ctv -o ExpressionParser.cs ExpressionParser.jay < $(topdir)/../jay/skeleton.cs )
 
 BUILT_SOURCES = $(EXPR_PARSER).cs
 
