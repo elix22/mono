@@ -149,7 +149,7 @@ namespace System
 			return true;
 		}
 
-#if (!MONODROID && !MONOTOUCH && !XAMMAC) || MOBILE_DESKTOP_HOST
+#if (!MONOTOUCH && !XAMMAC) || MOBILE_DESKTOP_HOST
 #if WASM
 		[MethodImplAttribute(MethodImplOptions.InternalCall)]
 		extern static void mono_timezone_get_local_name (ref string name);

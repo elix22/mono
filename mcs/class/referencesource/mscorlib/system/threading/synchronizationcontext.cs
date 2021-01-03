@@ -293,8 +293,10 @@ namespace System.Threading
 #endif
 
 #if MONODROID && !MOBILE_DESKTOP_HOST
+            /* TBD ELI - not needed in our case
             if (context == null)
                 context = AndroidPlatform.GetDefaultSyncContext ();
+            */
 #endif
 
             return context;
