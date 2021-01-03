@@ -1,6 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
+using System.Runtime.InteropServices;
 
 namespace System
 {
@@ -139,14 +140,26 @@ namespace System
             return rnd.Next();
         }
 
+#if MONODROID
+        internal unsafe partial class Sys
+        {
+            [DllImport("libmono-native.so", EntryPoint = "SystemNative_GetNonCryptographicallySecureRandomBytes")]
+            internal static extern unsafe void GetNonCryptographicallySecureRandomBytes(byte* buffer, int length);
+        }
+#endif
+
         /*==================================GenerateGlobalSeed====================================
         **Action:  Creates a number to use as global seed.
         **Returns: An integer that is safe to use as seed values for thread-local seed generators.
         ==========================================================================================*/
         private static unsafe int GenerateGlobalSeed()
         {
-            int result;
+            int result=0;
+#if MONODROID
+            Sys.GetNonCryptographicallySecureRandomBytes((byte*)&result, sizeof(int));
+#else
             Interop.GetRandomBytes((byte*)&result, sizeof(int));
+#endif
             return result;
         }
 

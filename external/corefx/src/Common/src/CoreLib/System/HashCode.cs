@@ -41,8 +41,6 @@ https://raw.githubusercontent.com/Cyan4973/xxHash/5c174cfa4e45a42f94082dc0d4539b
 
 */
 
-
-using System.Runtime.InteropServices;
 using System.Collections.Generic;
 #if !MONO
 using System.ComponentModel;
@@ -68,22 +66,10 @@ namespace System
         private uint _queue1, _queue2, _queue3;
         private uint _length;
 
-#if MONODROID
-        internal unsafe partial class Sys
-        {
-            [DllImport("libmono-native.so", EntryPoint = "SystemNative_GetNonCryptographicallySecureRandomBytes")]
-            internal static extern unsafe void GetNonCryptographicallySecureRandomBytes(byte* buffer, int length);
-        }
-#endif
-
         private static unsafe uint GenerateGlobalSeed()
         {
-            uint result = 0;
-#if MONODROID
-            Sys.GetNonCryptographicallySecureRandomBytes((byte*)&result, sizeof(int));
-#else
-            Interop.GetRandomBytes((byte*)&result, sizeof(int));
-#endif
+            uint result;
+            Interop.GetRandomBytes((byte*)&result, sizeof(uint));
             return result;
         }
 
