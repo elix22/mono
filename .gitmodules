@@ -68,3 +68,6 @@
 [submodule "external/bdwgc"]
 	path = external/bdwgc
 	url = git://github.com/Unity-Technologies/bdwgc.git
+[submodule "external/corefx"]
+	path = external/corefx
+	url = https://github.com/elix22/corefx.git
