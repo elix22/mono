@@ -55,6 +55,7 @@ class OffsetsTool:
 				sys.exit (1)
 
 		parser = argparse.ArgumentParser ()
+		parser.add_argument ('--extra-cflag=', dest='extra_cflags', action='append', help='extra flags for clang')
 		parser.add_argument ('--libclang', dest='libclang', help='path to shared library of libclang.{so,dylib}', required=True)
 		parser.add_argument ('--emscripten-sdk', dest='emscripten_path', help='path to emscripten sdk')
 		parser.add_argument ('--outfile', dest='outfile', help='path to output file', required=True)
@@ -80,6 +81,9 @@ class OffsetsTool:
 		self.target = None
 		self.target_args = []
 		android_api_level = "-D__ANDROID_API=21"
+
+		if args.extra_cflags:
+			self.target_args += args.extra_cflags
 
 		if "wasm" in args.abi:
 			require_emscipten_path (args)
